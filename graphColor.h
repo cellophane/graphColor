@@ -182,10 +182,14 @@ namespace graphColor {
 
 		}
 		int minSize = 10000000;
+		int actualMin = 100000000;
 		columnHeader* best = h->R;
 		columnHeader* c = best;
 		while (c != h) {
 			int cSize = c->size;
+			if (cSize < actualMin) {
+				actualMin = cSize;
+			}
 			if (c->name[0] == 'n') {
 				if (cSize < minSize) {
 					best = c;
@@ -195,7 +199,7 @@ namespace graphColor {
 			c = c->R;
 		}
 		c = best;
-		if (minSize == 0) {
+		if (actualMin == 0) {
 			return false;
 		}
 		cover(c);
@@ -222,7 +226,84 @@ namespace graphColor {
 
 	}
 
+	//solve exact cover maximizing color variety
+	std::vector<int> colorCount;
+	bool varietyDancingLinks(int solutionSize) {
+		columnHeader* h = columnHeaders[0];
 
+
+		if ((h->R == h) || solution.size() == solutionSize) { //we should never need the second condition. there is a bug.
+
+			return true;
+
+		}
+		int minSize = 10000000;
+		int actualMin = 10000000;
+		columnHeader* best = h->R;
+		columnHeader* c = best;
+
+		while (c != h) {
+			int cSize = c->size;
+			if (cSize < actualMin) {
+				actualMin = cSize;
+			}
+			if (c->name[0] == 'n') {
+				if (cSize < minSize) {
+					best = c;
+					minSize = best->size;
+				}
+			}
+			c = c->R;
+		}
+		c = best;
+		if (actualMin == 0) {
+			return false;
+		}
+		cover(c);
+		node* rowToChoose = c->D;
+		std::vector<std::pair<int,node*>> zip;
+		for (int i = 0; i < c->size; ++i) {
+			std::string rowName = rowToChoose->name;
+			int position = rowName.find('n');
+			int comma = rowName.find(',');
+			int color = std::stoi(rowName.substr(5, comma - 5));
+			zip.push_back(std::make_pair(colorCount[color], rowToChoose));
+			rowToChoose = rowToChoose->D;
+		}
+		std::sort(std::begin(zip), std::end(zip),
+			[&](const auto& a, const auto& b)
+			{
+				return a.first < b.first;
+			});
+
+		for (auto rPair : zip) {
+			node* rowToChoose = rPair.second;
+			std::string rowName = rowToChoose->name;
+			int position = rowName.find('n');
+			int comma = rowName.find(',');
+			int color = std::stoi(rowName.substr(5, comma - 5));
+			colorCount[color] += 1;
+			solution.push_back(rowToChoose->name);
+			node* toCover = rowToChoose->R;
+			while (rowToChoose != toCover) {
+				cover(toCover->C);
+				toCover = toCover->R;
+			}
+			if (varietyDancingLinks(solutionSize)) return true;
+
+			solution.pop_back();
+			colorCount[color] -= 1;
+			node* toUncover = rowToChoose->L;
+			while (rowToChoose != toUncover) {
+				uncover(toUncover->C);
+				toUncover = toUncover->L;
+			}
+			rowToChoose = rowToChoose->D;
+		}
+		uncover(c);
+		return false;
+
+	}
 
 
 	std::vector<int> extractColors(std::vector<std::string> solution) {
@@ -240,7 +321,7 @@ namespace graphColor {
 	}
 
 
-	bool graphColor(std::vector<int>& colors, std::vector<std::vector<int>> graph, int numColors = 4) {
+	bool graphColor(std::vector<int>& colors, std::vector<std::vector<int>> graph, int numColors = 4,bool maxVariety = false) {
 		std::vector<int> coloring;
 		std::vector<std::string> columns;
 		std::vector<std::string> rowNames;
@@ -286,7 +367,17 @@ namespace graphColor {
 		for (int i = 0; i < rowNames.size(); ++i) {
 			addRow(rows[i], rowNames[i]);
 		}
-		bool tried = dancingLinks(graph.size());
+		bool tried;
+		if (!maxVariety) {
+			tried = dancingLinks(graph.size());
+		}
+		else {
+			for (int i = 0; i < numColors; i++) {
+				colorCount.push_back(0);
+			}
+			tried = varietyDancingLinks(graph.size());
+
+		}
 		colors = extractColors(solution);
 		return tried;
 	}

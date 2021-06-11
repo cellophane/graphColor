@@ -18,7 +18,7 @@ void main() {
 	graph.push_back(v3);
 	graph.push_back(v4);
 	vector<int> colors;
-	bool success = graphColor::graphColor(colors, graph, 4);
+	bool success = graphColor::graphColor(colors, graph, 5,true);
 	cout << success;
 	for (auto c : colors) {
 		cout << c;
